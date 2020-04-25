@@ -9,7 +9,7 @@ all: port_analyzer
 
 
 port_analyzer: $(CFILES) $(HFILES)
-$(CC) $(CFLAGS) -o port_analyzer $(CFILES) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o port_analyzer $(CFILES) $(LDFLAGS)
 
 clean:
-rm -f port_analyzer
+	rm -f port_analyzer

@@ -7,7 +7,13 @@
 
 #endif //INC_618FINALPROJECT_FILE_HELPER_H
 
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <sys/time.h>
+#include <curl/curl.h>
+#include <math.h>
 /**
  * Helper to read ticker file
  * @param filename
@@ -24,3 +30,10 @@ char **read_ticker_file(char *filename, size_t *NUM_STOCKS);
  * @return
  */
 double *read_weight_file(char *filename, const size_t NUM_STOCKS);
+
+
+
+double *read_price_file(char *filename, size_t *data_size);
+
+
+char *get_stock_file(char *ticker, struct tm end_date, int num_years);
