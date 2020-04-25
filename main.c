@@ -3,6 +3,11 @@
 #include <math.h>
 #include "file_helper.h"
 #include <string.h>
+#include "portfolio_helper.h"
+#include <time.h>
+//#include <curl.h>
+#include <sys/time.h>
+
 int main(int argc, char **argv) {
     printf("Hello, World!\n");
     unsigned long seed = 0;
@@ -46,5 +51,32 @@ int main(int argc, char **argv) {
         printf("%lg\n", weights[i]);
     }
 
+
+    ret_data *dataset = malloc(NUM_ASSETS * sizeof(ret_data));
+    risky_asset *assets = malloc(NUM_ASSETS * sizeof(risky_asset));
+
+    time_t t = time(NULL);
+    struct tm curr_time = *localtime(&t);
+
+    /* Set up data structs for measuring the time taken to both retrieve
+  * stock data and run the simulations */
+    struct timeval retrieval_begin, retrieval_end, sim_begin, sim_end;
+    double retrieval_time, sim_time;
+    gettimeofday(&retrieval_begin, NULL);
+
+//    for(int i = 0; i < NUM_ASSETS; i++) {
+//        char*
+//    }
+
+    for(int i = 0; i < NUM_ASSETS; i++) {
+        char *price_filename = get_stock_file(ticks[i], curr_time, 6);
+        dataset[i].data = read_price_file(price_filename, &dataset[i].size);
+        assets[i].ticker = malloc((strlen(ticks[i]) + 1) * sizeof(char));
+        strcpy(assets[i].ticker, ticks[i]);
+
+    }
     return 0;
 }
+
+
+
