@@ -7,6 +7,8 @@
 #include <time.h>
 //#include <curl.h>
 #include <sys/time.h>
+#include <gsl/gsl_statistics_double.h>
+#include "gsl/include/gsl/gsl_matrix.h"
 
 int main(int argc, char **argv) {
     printf("Hello, World!\n");
@@ -69,11 +71,27 @@ int main(int argc, char **argv) {
 //    }
 
     for(int i = 0; i < NUM_ASSETS; i++) {
-        char *price_filename = get_stock_file(ticks[i], curr_time, 6);
+//        char *price_filename = get_stock_file(ticks[i], curr_time, 6);
+//        dataset[i].data = read_price_file(price_filename, &dataset[i].size);
+
+        /* Read the price data from locally-stored files */
+
+        char *price_subdir = "data/prices";
+        char *price_extension = "csv";
+        size_t price_fname_chars = strlen(ticks[i]) + strlen(price_subdir) +
+                        strlen(price_extension) + 3;
+        char price_filename[price_fname_chars];
+        snprintf(price_filename, price_fname_chars, "%s/%s.%s",
+                price_subdir, ticks[i], price_extension);
         dataset[i].data = read_price_file(price_filename, &dataset[i].size);
+
+
         assets[i].ticker = malloc((strlen(ticks[i]) + 1) * sizeof(char));
         strcpy(assets[i].ticker, ticks[i]);
 
+        assets[i].mean = gsl_stats_mean(dataset[i].data,1,dataset[i].size) * 12;
+        assets[i].sigma = gsl_stats_sd(dataset[i].data,1,dataset[i].size) * sqrt(12);
+        assets[i].port_weight = weights[i];
     }
     return 0;
 }
