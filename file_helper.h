@@ -14,6 +14,9 @@
 #include <sys/time.h>
 #include <curl/curl.h>
 #include <math.h>
+#include <gsl/gsl_matrix_double.h>
+#include "portfolio_helper.h"
+
 /**
  * Helper to read ticker file
  * @param filename
@@ -37,3 +40,13 @@ double *read_price_file(char *filename, size_t *data_size);
 
 
 char *get_stock_file(char *ticker, struct tm end_date, int num_years);
+
+
+gsl_matrix *calculate_varcovar(ret_data *dataset, size_t NUM_STOCKS);
+
+
+gsl_matrix* varcovar_from_file(const char *filename, int *NUM_ASSETS);
+
+
+risky_asset* assets_from_file(const char *filename,
+                              const int NUM_ASSETS);

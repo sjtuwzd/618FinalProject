@@ -1,25 +1,17 @@
-//
-// Created by zheng on 4/24/2020.
-//
-
-#ifndef INC_618FINALPROJECT_PORTFOLIO_HELPER_H
-#define INC_618FINALPROJECT_PORTFOLIO_HELPER_H
-
-#endif //INC_618FINALPROJECT_PORTFOLIO_HELPER_H
+#include <gsl/gsl_rng.h>
 #include <gsl/gsl_matrix.h>
 
+#ifndef PORTFOLIO_LIB_H
+#define PORTFOLIO_LIB_H
+/* Stores statistics information on the annual distribution of returns 
+ * of a single risky asset along with its ticker and
+ * weight within the portfolio */
 struct {
-    char* ticker;
+    char *ticker;
     double mean;
-    double sigma;
+    double sigma; /* The standard deviation of returns */
     double port_weight;
 } typedef risky_asset;
-
-
-struct {
-    double *data;
-    size_t size;
-} typedef ret_data;
 
 /* Create a new random number generator using the specified seed
  *
@@ -42,7 +34,7 @@ gsl_rng* initialize_rng_with_seed(unsigned long seed);
  */
 void perform_cholesky(gsl_matrix *matrix, const int NUM_ASSETS);
 
-/* Returns a pointer to a vector containing correlated, normally distributed
+/* Returns a pointer to a vector containing correlated, normally distributed 
  * random variables given the Cholesky decomposition
  *
  * \param NUM_ASSETS the number of assets to be generated random variables for
@@ -56,7 +48,7 @@ void perform_cholesky(gsl_matrix *matrix, const int NUM_ASSETS);
  * the caller's responsibility to free this memory.
  */
 gsl_vector* corr_norm_rvars(const int NUM_ASSETS, gsl_rng *rng,
-                            gsl_matrix *cholesky);
+        gsl_matrix *cholesky);
 
 /* Calculates the return of a portfolio for one month given distribution
  * information for two risky assets and two correlated random variables
@@ -68,7 +60,7 @@ gsl_vector* corr_norm_rvars(const int NUM_ASSETS, gsl_rng *rng,
  * \return the percentage return for the portfolio over the course of a month
  */
 double one_month_portfolio_return(risky_asset assets[],
-                                  const int NUM_ASSETS, gsl_vector *rans);
+        const int NUM_ASSETS, gsl_vector *rans);
 
 /* Calculates the return of a single risky asset given distribution
  * information for that asset and a random variable for that month
@@ -80,5 +72,4 @@ double one_month_portfolio_return(risky_asset assets[],
  * \return the percentage return on the single asset over a one-month period
  */
 double one_month_asset_return(double mean, double sigma, double rand_var);
-
-
+#endif

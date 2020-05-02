@@ -1,64 +1,15 @@
-//
-// Created by zheng on 4/24/2020.
-//
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include "driver_lib.h"
+#include <gsl/gsl_linalg.h>
 #include <ctype.h>
-#include <sys/time.h>
+#include <string.h>
 #include <curl/curl.h>
 #include <math.h>
-#include "portfolio_helper.h"
+#include <gsl/gsl_statistics_double.h>
 
-char **read_ticker_file(char *filename, size_t *NUM_STOCKS) {
-
-    FILE *ticker_file = fopen(filename, "r");
-    char **tickers;
-
-    const size_t  MAX_TICKER_SIZE = 6;
-    if(ticker_file) {
-        char line[MAX_TICKER_SIZE + 1];
-
-        // GET THE FIRST LINE, WHICH IS THE TOTAL NUMBER
-        fgets(line, sizeof(line), ticker_file);
-        // sscanf return the number of parameters successfully filled
-        int scanned = sscanf(line, "%zu", NUM_STOCKS);
-        tickers = malloc(*NUM_STOCKS * sizeof(char *));
-        for(int i = 0; i < *NUM_STOCKS && scanned != EOF; i++) {
-            //get the whole line
-            fgets(line, sizeof(line), ticker_file);
-            char *temp = malloc((strlen(line) + 1) * sizeof(char));
-            scanned = sscanf(line, "%5s", temp);
-            tickers[i] = temp;
-        }
-    } else{
-        printf("ERROR: Ticker file could not be opened");
-        exit(1);
-    }
-    fclose(ticker_file);
-    return tickers;
-}
-
-double *read_weight_file(char *filename, const size_t NUM_STOCKS){
-    FILE *file = fopen(filename, "r");
-    double *weights = malloc(NUM_STOCKS * sizeof(double ));
-    if(file) {
-        int scanned = 0;
-        double sum = 0;
-        for(int i = 0; i < NUM_STOCKS && scanned != EOF; i++) {
-            // long double
-            scanned = fscanf(file, "%lg", &weights[i]);
-        }
-        for (int j = 0; j < NUM_STOCKS ; ++j) {
-            sum += weights[j];
-        }
-    } else {
-        printf("ERROR: Weights file could not be opened\n");
-        exit(1);
-    }
-    return weights;
-}
+#ifndef GSL_MAT_H
+#define GSL_MAT_H
+#include <gsl/gsl_matrix.h>
+#endif
 
 char *str_upr(char *upr, char *src) {
     /* Iterate through the source string until null character is reached */
@@ -72,7 +23,6 @@ char *str_upr(char *upr, char *src) {
     return upr;
 }
 
-
 char *get_stock_file(char *ticker, struct tm end_date, int num_years) {
 
     char *tick_upr = malloc((strlen(ticker) + 1) * sizeof(char));
@@ -84,10 +34,10 @@ char *get_stock_file(char *ticker, struct tm end_date, int num_years) {
     size_t url_chars = 200;
     char url[url_chars];
     snprintf(url, url_chars, "http://real-chart.finance.yahoo.com/table.csv?"
-                             "s=%s&a=%02d&b=%02d&c=%04d&d=%02d&e=%02d&f=%04d&g=m&ignore=.csv",
-             tick_upr, end_date.tm_mon, end_date.tm_mday,
-             end_date.tm_year + 1900 - num_years, end_date.tm_mon,
-             end_date.tm_mday, end_date.tm_year + 1900);
+            "s=%s&a=%02d&b=%02d&c=%04d&d=%02d&e=%02d&f=%04d&g=m&ignore=.csv",
+            tick_upr, end_date.tm_mon, end_date.tm_mday,
+            end_date.tm_year + 1900 - num_years, end_date.tm_mon,
+            end_date.tm_mday, end_date.tm_year + 1900);
 
     /* Create the file name string, simply the stock ticker with an extension */
     char *ext = "csv";
@@ -124,6 +74,8 @@ char *get_stock_file(char *ticker, struct tm end_date, int num_years) {
 
 double *read_price_file(char *filename, size_t *data_size) {
 
+    printf("Entering read_price_file of %s\n", filename);
+
     FILE *data_file = fopen(filename, "r");
 
     /* Monthly data for the past five years (~60 months) for each stock will
@@ -134,6 +86,7 @@ double *read_price_file(char *filename, size_t *data_size) {
     double *ret_data = malloc(ret_cap * sizeof(double));
 
     if (data_file) {
+        printf("%s file exist, if passed!\n", filename);
         /* Initialize to negative values to be able to tell whether the first
          * price has been read */
         double prev_price = -1, curr_price = -1;
@@ -141,7 +94,7 @@ double *read_price_file(char *filename, size_t *data_size) {
         /* Throw away the first line of input
          * It just contains header labels */
         int scanned = fscanf(data_file, "%*s");
-
+        printf("%d", scanned);
         while (scanned != EOF) {
             /* Make sure that array is large enough to store the next
              * data point */
@@ -156,18 +109,20 @@ double *read_price_file(char *filename, size_t *data_size) {
                 ret_data = tmp;
             }
 
-            /* If this is the first line to be read,
+            /* If this is the first line to be read, 
              * there is no current price, so read in first price */
             if (curr_price < 0) {
                 scanned = fscanf(data_file,
-                                 "%*[^,],%*g,%*g,%*g,%*g,%*d,%lg", &curr_price);
+                        "%*[^,],%*g,%*g,%*g,%*g,%*d,%lg", &curr_price);
             } else {
                 scanned = fscanf(data_file,
-                                 "%*[^,],%*g,%*g,%*g,%*g,%*d,%lg", &prev_price);
+                        "%*[^,],%*g,%*g,%*g,%*g,%*d,%lg", &prev_price);
                 if (scanned != EOF) {
+                    printf("current price is %f, previous price is%f\n", curr_price, prev_price);
                     /* Formula for monthly return =
                      * ln(this month's price/last month's price) */
                     ret_data[num_rets] = log(curr_price / prev_price);
+                    printf("%s: %f\n", filename, ret_data[num_rets]);
                     num_rets++;
 
                     /* Parallelism inhibitor: loop-carried dependency */
@@ -182,17 +137,71 @@ double *read_price_file(char *filename, size_t *data_size) {
 
     /* Set the value for the size of the data to be accessible by the caller */
     *data_size = num_rets;
+    fclose(data_file);
     return ret_data;
 }
 
+char **read_ticker_file(char *filename, size_t *NUM_STOCKS) {
+    FILE *ticker_file = fopen(filename, "r");
+    char **tickers;
+    
+    /* Assuming the maximum size for a stock ticker is 6 characters.
+     * Adjust this if need be. Keeping it low ensures that not too much
+     * memory is wasted. */
+    const size_t MAX_TICK_SIZE = 6;
+    if (ticker_file) {
+        /* Each line only contains one ticker in the tickers file */
+        char line[MAX_TICK_SIZE + 1];
 
+        /* Get the first line, which is just the number of stocks to be read */
+        fgets(line, sizeof line, ticker_file);
+        int scanned = sscanf(line, "%lu", NUM_STOCKS);
+
+        tickers = malloc(*NUM_STOCKS * sizeof(char *));
+        /* Read the tickers and populate the tickers array */
+        for (int i = 0; i < *NUM_STOCKS && scanned != EOF; i++) {
+            /* Get the whole line - safe way to prevent buffer overflow */
+            fgets(line, sizeof line, ticker_file);
+            /* Allocate memory to the current ticker string based on the size
+             * of the line, then add it to the array */
+            char *temp = malloc((strlen(line) + 1) * sizeof(char));
+            scanned = sscanf(line, "%5s", temp);
+            tickers[i] = temp;
+        }
+    } else {
+        printf("ERROR: Ticker file could not be opened\n");
+        exit(1);
+    }
+    fclose(ticker_file);
+    
+    return tickers;
+}
+
+double *read_weight_file(char *filename, const size_t NUM_STOCKS) {
+    FILE *file = fopen(filename, "r");
+    double *weights = malloc(NUM_STOCKS * sizeof(double));
+    if (file) {
+        int scanned = 0;
+        double sum = 0;
+        /* Get the current weight and add to array */
+        for (int i = 0; i < NUM_STOCKS && scanned != EOF; i++)
+            scanned = fscanf(file, "%lg", &weights[i]);
+        /* Total up all weights in the array and check if it is equal to 100% */
+        for (int i = 0; i < NUM_STOCKS; i++)
+            sum += weights[i];
+    } else {
+        printf("ERROR: Weights file could not be opened\n");
+        exit(1);
+    }
+    return weights;
+}
 
 gsl_matrix *calculate_varcovar(ret_data *dataset, size_t NUM_STOCKS) {
 
     /* Create the varcorvar matrix */
     gsl_matrix *varcovar = gsl_matrix_alloc(NUM_STOCKS, NUM_STOCKS);
 
-    /* Fill the upper triangle (and diagonal) of the varcovar matrix
+    /* Fill the upper triangle (and diagonal) of the varcovar matrix 
      * by calculating the covariance */
     for (int i = 0; i < NUM_STOCKS; i++) {
         for (int j = i; j < NUM_STOCKS; j++) {
@@ -200,7 +209,8 @@ gsl_matrix *calculate_varcovar(ret_data *dataset, size_t NUM_STOCKS) {
              * assumption since all stocks will have return data going back
              * to and from the same points in time */
             double covar = gsl_stats_covariance(dataset[i].data, 1,
-                                                dataset[j].data, 1, dataset[i].size);
+                    dataset[j].data, 1, dataset[i].size);
+            printf("Current i is %d, current j is %d, covar is %f\n",i, j, covar);
             gsl_matrix_set(varcovar, i, j, covar);
         }
     }
@@ -209,7 +219,7 @@ gsl_matrix *calculate_varcovar(ret_data *dataset, size_t NUM_STOCKS) {
     for (int i = 1; i < NUM_STOCKS; i++) {
         for (int j = 0; j < i; j++) {
             gsl_matrix_set(varcovar, i, j,
-                           gsl_matrix_get(varcovar, j, i));
+                    gsl_matrix_get(varcovar, j, i));
         }
     }
     return varcovar;
@@ -229,10 +239,10 @@ gsl_matrix* varcovar_from_file(const char *filename, int *NUM_ASSETS) {
         /* Read all numbers from file and place into matrix */
         for (int i = 0; i < *NUM_ASSETS; i++) {
             for (int j = 0; j < *NUM_ASSETS; j++) {
-                double curr;
+                double curr; 
                 fscanf(vc_file, "%lf,", &curr);
                 gsl_matrix_set(varcovar, i, j, curr);
-            }
+            } 
         }
     } else {
         printf("ERROR: no variance-covariance matrix file provided\n");
@@ -243,16 +253,16 @@ gsl_matrix* varcovar_from_file(const char *filename, int *NUM_ASSETS) {
 }
 
 risky_asset* assets_from_file(const char *filename,
-                              const int NUM_ASSETS) {
+        const int NUM_ASSETS) {
 
     risky_asset *assets = (risky_asset *)malloc(NUM_ASSETS *
-                                                sizeof(risky_asset));
+            sizeof(risky_asset));
 
     FILE *asset_file = fopen(filename, "r");
     if (asset_file) {
         for (int i = 0; i < NUM_ASSETS; i++) {
             fscanf(asset_file, "%lg,%lg,%lg", &assets[i].mean, &assets[i].sigma,
-                   &assets[i].port_weight);
+                    &assets[i].port_weight);
         }
     } else {
         printf("ERROR: valid asset file not provided\n");
@@ -272,3 +282,5 @@ risky_asset* assets_from_file(const char *filename,
 
     return assets;
 }
+
+
