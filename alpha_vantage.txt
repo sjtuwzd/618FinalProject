@@ -1,0 +1,4 @@
+Welcome to Alpha Vantage!
+
+Here is your API key:
+ES1O2L3E53BH8P7K
