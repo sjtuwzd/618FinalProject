@@ -118,7 +118,7 @@ double *read_price_file(char *filename, size_t *data_size) {
                 scanned = fscanf(data_file,
                         "%*[^,],%*g,%*g,%*g,%*g,%lg,%*d", &prev_price);
                 if (scanned != EOF) {
-                    printf("current price is %f, previous price is%f\n", curr_price, prev_price);
+//                    printf("current price is %f, previous price is%f\n", curr_price, prev_price);
                     /* Formula for monthly return =
                      * ln(this month's price/last month's price) */
                     ret_data[num_rets] = log(curr_price / prev_price);

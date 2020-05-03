@@ -111,11 +111,11 @@ int main(int argc, char **argv) {
      * all assets */
     gsl_matrix *varcovar = calculate_varcovar(dataset, NUM_ASSETS);
 
-    for(int i = 0; i < 2; i ++) {
-        for(int j = 0; j < 2; j++) {
-            printf("%f\n", gsl_matrix_get(varcovar, i, j));
-        }
-    }
+//    for(int i = 0; i < 2; i ++) {
+//        for(int j = 0; j < 2; j++) {
+//            printf("%f\n", gsl_matrix_get(varcovar, i, j));
+//        }
+//    }
 
 
 
