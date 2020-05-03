@@ -131,69 +131,130 @@ int main(int argc, char **argv) {
     printf("Finished crunching numbers and getting data for stock returns\n"
             "Beginning simulations\n");
 
-    /* This file will contain the final porfolio returns for all runs */
-    FILE *results_file = fopen("data/results.txt","w");
-    double total_rets[NUM_RUNS];
+    double change_amount = 0.05;
+    // variables used to check the best strategy
+    double best_result = 0.0;
+    int best_i = 0;
+    int best_j = 0;
+    double best_dev = 0.0;
 
-    /* Start the Monte Carlo simulation timer */
-    gettimeofday(&sim_begin, NULL);
 
-    if(results_file) {
-        /* Each run of this loop is one simulation of portfolio's return */
+    for(int i = 0; i < NUM_ASSETS; i++) {
+        for (int j = 0; j < NUM_ASSETS; j++) {
+
+            // not the same stock or the first run
+        if(i == 0 || i != j) {
+
+
+            if(assets[i].port_weight >= change_amount) {
+                assets[i].port_weight -= change_amount;
+                assets[j].port_weight += change_amount;
+            } else{
+                assets[i].port_weight = 0.0;
+                assets[j].port_weight += change_amount;
+            }
+            char *result_subdir = "data";
+            char *result_extension = "txt";
+            char *name = "result";
+            size_t result_fname_chars = strlen(result_subdir) + strlen(assets[i].ticker) + strlen(assets[j].ticker)+
+                                       strlen(result_extension) + 13 + strlen(name);
+            char result_filename[result_fname_chars];
+
+            snprintf(result_filename, result_fname_chars, "%s/%s_add%s_minus%s.%s",
+                     result_subdir, name, assets[j].ticker, assets[i].ticker, result_extension);
+
+
+
+            printf("Adding weight of %s, decreasing weight of %s\n", assets[j].ticker, assets[i].ticker);
+            /* This file will contain the final porfolio returns for all runs */
+//            FILE *results_file = fopen("data/results.txt", "w");
+            FILE *results_file = fopen(result_filename,  "w");
+            double total_rets[NUM_RUNS];
+
+            /* Start the Monte Carlo simulation timer */
+            gettimeofday(&sim_begin, NULL);
+
+            if (results_file) {
+                /* Each run of this loop is one simulation of portfolio's return */
 //        #pragma omp parallel for
-        for (int run = 0; run < NUM_RUNS; run++) {
-            double total_return = 0;
+                for (int run = 0; run < NUM_RUNS; run++) {
+                    double total_return = 0;
 
-            gsl_rng *rng;
-            /* Seed is shared, so lock it down when it is being used and
-             * incremented so that no two RNGs are initialized with the
-             * same seed */
+                    gsl_rng *rng;
+                    /* Seed is shared, so lock it down when it is being used and
+                     * incremented so that no two RNGs are initialized with the
+                     * same seed */
 //            #pragma omp critical
 //            {
-                rng = initialize_rng_with_seed(seed);
-                /* When seed hits max unsigned long it will wrap to 0 */
-                seed++;
+                    rng = initialize_rng_with_seed(seed);
+                    /* When seed hits max unsigned long it will wrap to 0 */
+                    seed++;
 //            }
 
-            /* Calculate the monthly portfolio return
-             * and add to yearly return accumulator */
-            for (int month = 1; month <= NUM_MONTHS; month++) {
-                gsl_vector *rans = corr_norm_rvars(NUM_ASSETS, rng, cholesky);
-                double month_ret = one_month_portfolio_return(assets,
-                        NUM_ASSETS, rans);
-                gsl_vector_free(rans);
-                total_return += month_ret;
+                    /* Calculate the monthly portfolio return
+                     * and add to yearly return accumulator */
+                    for (int month = 1; month <= NUM_MONTHS; month++) {
+                        gsl_vector *rans = corr_norm_rvars(NUM_ASSETS, rng, cholesky);
+                        double month_ret = one_month_portfolio_return(assets,
+                                                                      NUM_ASSETS, rans);
+                        gsl_vector_free(rans);
+                        total_return += month_ret;
+                    }
+                    gsl_rng_free(rng);
+
+                    total_rets[run] = total_return;
+                }
+                gettimeofday(&sim_end, NULL);
+
+                /* Calculate time elapsed for data retrieval and simulations */
+                retrieval_time = retrieval_end.tv_sec - retrieval_begin.tv_sec;
+                retrieval_time += ((double) (retrieval_end.tv_usec -
+                                             retrieval_begin.tv_usec)) / 1000000.0;
+
+                sim_time = sim_end.tv_sec - sim_begin.tv_sec;
+                sim_time += ((double) (sim_end.tv_usec - sim_begin.tv_usec)) / 1000000.0;
+                printf("Data retrieval time: %lg\n"
+                       "Simulation time: %lg\n", retrieval_time, sim_time);
+
+                for (int i = 0; i < NUM_RUNS; i++) {
+                    fprintf(results_file, "%lg\n", total_rets[i] * 100);
+                }
+                fclose(results_file);
+
+                double res_mean = gsl_stats_mean(total_rets, 1, NUM_RUNS) * 100;
+                double res_std = gsl_stats_sd(total_rets, 1, NUM_RUNS) * 100;
+
+                // the first run, store into the variable
+                if(i == 0 && j == 0) {
+                    best_result = res_mean;
+                    best_dev = res_std;
+                    best_i = i;
+                    best_j = j;
+                }
+                else {
+                    if(res_mean > best_result) {
+                        best_result = res_mean;
+                        best_dev = res_std;
+                        best_i = i;
+                        best_j = j;
+                    }
+                }
+
+                printf("Mean of percentage returns: %lg%%\n"
+                       "Standard dev of percentage returns: %lg%%\n",
+                       res_mean, res_std);
+            } else {
+                printf("NO RESULTS FILE\n");
             }
-            gsl_rng_free(rng);
-
-            total_rets[run] = total_return;
         }
-        gettimeofday(&sim_end, NULL);
-
-        /* Calculate time elapsed for data retrieval and simulations */
-        retrieval_time = retrieval_end.tv_sec - retrieval_begin.tv_sec;
-        retrieval_time += ((double)(retrieval_end.tv_usec -
-                            retrieval_begin.tv_usec)) / 1000000.0;
-
-        sim_time = sim_end.tv_sec - sim_begin.tv_sec;
-        sim_time += ((double)(sim_end.tv_usec - sim_begin.tv_usec)) / 1000000.0;
-        printf("Data retrieval time: %lg\n"
-                "Simulation time: %lg\n", retrieval_time, sim_time);
-
-        for (int i = 0; i < NUM_RUNS; i++) {
-            fprintf(results_file, "%lg\n", total_rets[i] * 100);
         }
-        fclose(results_file);
-
-        double res_mean = gsl_stats_mean(total_rets,1,NUM_RUNS) * 100;
-        double res_std = gsl_stats_sd(total_rets,1,NUM_RUNS)* 100;
-
-        printf("Mean of annual returns: %lg%%\n"
-                "Standard dev of annual returns: %lg%%\n",
-                res_mean, res_std);
-    } else {
-        printf("NO RESULTS FILE\n");
     }
+
+
+    printf("The best strategy is to add %s while decreasing %s\n", assets[best_j].ticker, assets[best_i].ticker);
+    printf("The Resulted Mean of percentage returns: %lg%%\n"
+           "The ResultedStandard dev of percentage returns: %lg%%\n",
+           best_result, best_dev);
     gsl_matrix_free(cholesky);
     exit(0);
 }
