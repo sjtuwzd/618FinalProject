@@ -93,8 +93,10 @@ int main(int argc, char **argv) {
         strcpy(assets[i].ticker, ticks[i]);
 
         /* Set the rest of the current asset's attributes */
-        assets[i].mean = gsl_stats_mean(dataset[i].data,1,dataset[i].size) * 12;
-        assets[i].sigma = gsl_stats_sd(dataset[i].data,1,dataset[i].size) * sqrt(12);
+//        assets[i].mean = gsl_stats_mean(dataset[i].data,1,dataset[i].size) * 12;
+        assets[i].mean = gsl_stats_mean(dataset[i].data,1,dataset[i].size) * 252;
+//        assets[i].sigma = gsl_stats_sd(dataset[i].data,1,dataset[i].size) * sqrt(12);
+        assets[i].sigma = gsl_stats_sd(dataset[i].data,1,dataset[i].size) * sqrt(252);
         assets[i].port_weight = weights[i];
         printf("end reading price file!\n");
     }
