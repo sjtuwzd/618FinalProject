@@ -74,7 +74,7 @@ char *get_stock_file(char *ticker, struct tm end_date, int num_years) {
 
 double *read_price_file(char *filename, size_t *data_size) {
 
-    printf("Entering read_price_file of %s\n", filename);
+//    printf("Entering read_price_file of %s\n", filename);
 
     FILE *data_file = fopen(filename, "r");
 
@@ -86,7 +86,7 @@ double *read_price_file(char *filename, size_t *data_size) {
     double *ret_data = malloc(ret_cap * sizeof(double));
 
     if (data_file) {
-        printf("%s file exist, if passed!\n", filename);
+//        printf("%s file exist, if passed!\n", filename);
         /* Initialize to negative values to be able to tell whether the first
          * price has been read */
         double prev_price = -1, curr_price = -1;
@@ -122,7 +122,7 @@ double *read_price_file(char *filename, size_t *data_size) {
                     /* Formula for monthly return =
                      * ln(this month's price/last month's price) */
                     ret_data[num_rets] = log(curr_price / prev_price);
-                    printf("%s: %f\n", filename, ret_data[num_rets]);
+//                    printf("%s: %f\n", filename, ret_data[num_rets]);
                     num_rets++;
 
                     /* Parallelism inhibitor: loop-carried dependency */

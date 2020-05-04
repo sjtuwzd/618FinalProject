@@ -27,18 +27,20 @@ void send_node_state(char* add_ticker, char* decrease_ticker, double best_result
 int main(int argc, char **argv) {
 
     unsigned long seed = 0;
-    if (argc < 4 || argc > 5) {
-        printf("ERROR: You have not provided exactly four or"
-               "exactly five arguments\n");
+    if (argc < 5 || argc > 6) {
+        printf("ERROR: You have not provided exactly five or"
+               "exactly six arguments\n");
         exit(1);
         /* Set the seed if it has been provided */
-    } else if (argc == 5) {
-        seed = strtoul(argv[4], NULL, 10);
+    } else if (argc == 6) {
+        seed = strtoul(argv[5], NULL, 10);
     }
 
     const int NUM_MONTHS = atoi(argv[1]);
     const int NUM_RUNS = atoi(argv[2]);
     const char *PORT_SUFF = argv[3];
+    char *METHOD = argv[4];
+    printf("%s", METHOD);
     size_t NUM_ASSETS = 0;
 
     /* Build the names of the files containing the assets' tickers and
@@ -142,7 +144,7 @@ int main(int argc, char **argv) {
 
     double change_amount = 0.05;
     // variables used to check the best strategy
-    double best_result = 0.0;
+    double best_result = -100.0;
     int best_i = 0;
     int best_j = 0;
     double best_dev = 0.0;
@@ -153,31 +155,46 @@ int main(int argc, char **argv) {
     int this_zone = 0;
     int nzone = 0;
 #if MPI
-    MPI_Init(NULL, NULL);
-    MPI_Comm_size(MPI_COMM_WORLD, &process_count);
-    MPI_Comm_rank(MPI_COMM_WORLD, &this_zone);
+    if(strcmp(METHOD, "best") == 0) {
+        MPI_Init(NULL, NULL);
+        MPI_Comm_size(MPI_COMM_WORLD, &process_count);
+        MPI_Comm_rank(MPI_COMM_WORLD, &this_zone);
+    }
 #endif
-    nzone = process_count;
+    int i_start, i_end;
+    int j_end = NUM_ASSETS;
     bool mpi_master = this_zone == 0;
-    printf("Rank %d out of %d processes.\n", this_zone, nzone);
 
-    int i_start = this_zone * (NUM_ASSETS / nzone);
-    int i_end = (this_zone + 1) * (NUM_ASSETS / nzone);
-    i_end = this_zone == nzone - 1 ? NUM_ASSETS : i_end;
+    // if is for best strategy
+    if(strcmp(METHOD, "best") == 0) {
+        nzone = process_count;
+        printf("Rank %d out of %d processes.\n", this_zone, nzone);
 
-    seed = this_zone * NUM_ASSETS * NUM_ASSETS * NUM_RUNS;
-    if(mpi_master) {
-        gettimeofday(&total_sim_begin, NULL);
+        i_start = this_zone * (NUM_ASSETS / nzone);
+        i_end = (this_zone + 1) * (NUM_ASSETS / nzone);
+        i_end = this_zone == nzone - 1 ? NUM_ASSETS : i_end;
+
+        seed = this_zone * NUM_ASSETS * NUM_ASSETS * NUM_RUNS;
+        // for (int i = 0; i < NUM_ASSETS; i++) {
+    }
+    // just for predicting the current performance
+    else {
+        printf("Hello!\n");
+        i_start = 0;
+        i_end = 1;
+        j_end = 1;
     }
 
-    // for (int i = 0; i < NUM_ASSETS; i++) {
-    printf("Start i is %d, end i is %d\n", i_start, i_end);
+    // start timing
+    if (mpi_master) {
+        gettimeofday(&total_sim_begin, NULL);
+    }
+    printf("J end is: %d\n", j_end);
     for (int i = i_start; i < i_end; i++) {
-        for (int j = 0; j < NUM_ASSETS; j++) {
+        for (int j = 0; j < j_end; j++) {
 
             // not the same stock or the first run
             if (i == 0 || i != j) {
-
                 double original_i_weight = assets[i].port_weight;
                 double original_j_weight = assets[j].port_weight;
 
@@ -199,7 +216,7 @@ int main(int argc, char **argv) {
                 snprintf(result_filename, result_fname_chars, "%s/%s_add%s_minus%s.%s",
                          result_subdir, name, assets[j].ticker, assets[i].ticker, result_extension);
 
-                printf("Adding weight of %s, decreasing weight of %s\n", assets[j].ticker, assets[i].ticker);
+//                printf("Adding weight of %s, decreasing weight of %s\n", assets[j].ticker, assets[i].ticker);
                 /* This file will contain the final porfolio returns for all runs */
                 // FILE *results_file = fopen("data/results.txt", "w");
                 FILE *results_file = fopen(result_filename,  "w");
@@ -250,8 +267,8 @@ int main(int argc, char **argv) {
                     printf("Data retrieval time: %lg\n"
                            "Simulation time: %lg\n", retrieval_time, sim_time);
 
-                    for (int i = 0; i < NUM_RUNS; i++) {
-                        fprintf(results_file, "%lg\n", total_rets[i] * 100);
+                    for (int run = 0; run < NUM_RUNS; run++) {
+                        fprintf(results_file, "%lg\n", total_rets[run] * 100);
                     }
                     fclose(results_file);
 
@@ -273,9 +290,8 @@ int main(int argc, char **argv) {
                         }
                     }
 
-                    printf("Mean of percentage returns: %lg%%\n"
-                           "Standard dev of percentage returns: %lg%%\n",
-                           res_mean, res_std);
+                    printf("Adding weight of %s, decreasing weight of %s, Mean of percentage returns: %lg%%.Standard dev of percentage returns: %lg%%\n",
+                            assets[j].ticker, assets[i].ticker, res_mean, res_std);
                 } else {
                     printf("NO RESULTS FILE\n");
                 }
@@ -283,6 +299,7 @@ int main(int argc, char **argv) {
                 assets[i].port_weight = original_i_weight;
                 assets[j].port_weight = original_j_weight;
             }
+
         }
     }
 
@@ -292,15 +309,24 @@ int main(int argc, char **argv) {
     //            "The Resulted Standard dev of percentage returns: %lg%%\n",
     //            this_zone, best_result, best_dev);
     // }
+
+#if !MPI
+         printf("Process %d: The best strategy is to add %s while decreasing %s\n", this_zone, assets[best_j].ticker, assets[best_i].ticker);
+         printf("Process %d: The Resulted Mean of percentage returns: %lg%%\n"
+                "The Resulted Standard dev of percentage returns: %lg%%\n",
+                this_zone, best_result, best_dev);
+#endif
     gsl_matrix_free(cholesky);
 
 #if MPI
-    if (mpi_master)
-        gather_node_state(nzone, assets[best_j].ticker, assets[best_i].ticker, best_result, best_dev);
-    else
-        send_node_state(assets[best_j].ticker, assets[best_i].ticker, best_result, best_dev);
+    if(strcmp(METHOD, "best") == 0) {
+        if (mpi_master)
+            gather_node_state(nzone, assets[best_j].ticker, assets[best_i].ticker, best_result, best_dev);
+        else
+            send_node_state(assets[best_j].ticker, assets[best_i].ticker, best_result, best_dev);
 
-    MPI_Finalize();
+        MPI_Finalize();
+    }
 #endif
 
     if(mpi_master) {
