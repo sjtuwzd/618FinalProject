@@ -13,6 +13,13 @@
 #include "portfolio_lib.h"
 #include "driver_lib.h"
 
+#ifndef MPI
+#define MPI 0
+#endif
+
+#if MPI
+#include <mpi.h>
+#endif
 int main(int argc, char **argv) {
 
     unsigned long seed = 0;
