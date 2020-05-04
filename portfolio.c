@@ -72,8 +72,8 @@ int main(int argc, char **argv) {
 
     /* Set up data structs for measuring the time taken to both retrieve
      * stock data and run the simulations */
-    struct timeval retrieval_begin, retrieval_end, sim_begin, sim_end;
-    double retrieval_time, sim_time;
+    struct timeval retrieval_begin, retrieval_end, sim_begin, sim_end, total_sim_begin, total_sim_end;
+    double retrieval_time, sim_time, total_sim_time;
 
     /* Start data retrieval timer */
     gettimeofday(&retrieval_begin, NULL);
@@ -166,8 +166,12 @@ int main(int argc, char **argv) {
     i_end = this_zone == nzone - 1 ? NUM_ASSETS : i_end;
 
     seed = this_zone * NUM_ASSETS * NUM_ASSETS * NUM_RUNS;
+    if(mpi_master) {
+        gettimeofday(&total_sim_begin, NULL);
+    }
 
     // for (int i = 0; i < NUM_ASSETS; i++) {
+    printf("Start i is %d, end i is %d\n", i_start, i_end);
     for (int i = i_start; i < i_end; i++) {
         for (int j = 0; j < NUM_ASSETS; j++) {
 
@@ -298,6 +302,13 @@ int main(int argc, char **argv) {
 
     MPI_Finalize();
 #endif
+
+    if(mpi_master) {
+        gettimeofday(&total_sim_end, NULL);
+        total_sim_time = total_sim_end.tv_sec - total_sim_begin.tv_sec;
+        total_sim_time += ((double) (total_sim_end.tv_usec - total_sim_begin.tv_usec)) / 1000000.0;
+        printf("Total Simulation time: %lg\n", total_sim_time);
+    }
     exit(0);
 }
 
