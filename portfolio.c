@@ -152,6 +152,9 @@ int main(int argc, char **argv) {
             // not the same stock or the first run
         if(i == 0 || i != j) {
 
+            double original_i_weight = assets[i].port_weight;
+            double original_j_weight = assets[j].port_weight;
+
 
             if(assets[i].port_weight >= change_amount) {
                 assets[i].port_weight -= change_amount;
@@ -253,6 +256,9 @@ int main(int argc, char **argv) {
             } else {
                 printf("NO RESULTS FILE\n");
             }
+
+            assets[i].port_weight = original_i_weight;
+            assets[j].port_weight = original_j_weight;
         }
         }
     }
