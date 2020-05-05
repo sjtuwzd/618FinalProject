@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
                         }
                     }
 
-                    printf("Adding weight of %s, decreasing weight of %s, Mean of percentage returns: %lg%%.Standard dev of percentage returns: %lg%%\n",
+                    printf("Process %d, I is %d, j is %d, Adding weight of %s, decreasing weight of %s, Mean of percentage returns: %lg%%.Standard dev of percentage returns: %lg%%\n", this_zone, i, j,
                             assets[j].ticker, assets[i].ticker, res_mean, res_std);
                 } else {
                     printf("NO RESULTS FILE\n");
