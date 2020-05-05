@@ -170,8 +170,8 @@ int main(int argc, char **argv) {
         nzone = process_count;
         printf("Rank %d out of %d processes.\n", this_zone, nzone);
 
-        i_start = this_zone * (NUM_ASSETS / nzone);
-        i_end = (this_zone + 1) * (NUM_ASSETS / nzone);
+        i_start = this_zone * (ceil((double)NUM_ASSETS / (double)nzone));
+        i_end = (this_zone + 1) * (ceil((double)NUM_ASSETS / (double)nzone));
         i_end = this_zone == nzone - 1 ? NUM_ASSETS : i_end;
 
         seed = this_zone * NUM_ASSETS * NUM_ASSETS * NUM_RUNS;
@@ -190,6 +190,7 @@ int main(int argc, char **argv) {
         gettimeofday(&total_sim_begin, NULL);
     }
     printf("J end is: %d\n", j_end);
+    printf("Process %d, start i is %d, end i is %d\n", this_zone,i_start, i_end);
     for (int i = i_start; i < i_end; i++) {
         for (int j = 0; j < j_end; j++) {
 
