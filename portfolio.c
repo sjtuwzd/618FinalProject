@@ -344,17 +344,25 @@ int main(int argc, char **argv) {
 void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, double best_result_0, double best_dev_0) {
     int i;
     /* MPI buffer */
-    char add_ticker[5];
-    char decrease_ticker[5];
-    double data_buf[2];
+//    char add_ticker[5];
+//    char decrease_ticker[5];
+//    double data_buf[2];
 
-    // int curr_best_zone = 0;
+     int curr_best_zone = 0;
     char* curr_add_ticker = add_ticker_0;
     char* curr_decrease_ticker = decrease_ticker_0;
     double curr_best_result = best_result_0;
     double curr_best_dev = best_dev_0;
 
     for (i = 1; i < nzone; i++) {
+
+        printf("At beginning decrease ticker is %s\n", curr_decrease_ticker);
+            /* MPI buffer */
+//    char add_ticker[5];
+//    char decrease_ticker[5];
+    char *add_ticker = malloc(5 * sizeof(char));
+    char *decrease_ticker = malloc(5 * sizeof(char));
+    double data_buf[2];
         MPI_Recv(add_ticker, 5,
                  MPI_CHAR, i, 0, MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
@@ -367,21 +375,23 @@ void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, d
                  MPI_DOUBLE, i, 0, MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
 
-        // printf("Received from process %d: The best strategy is to add %s and decrease %s.\n"
-        //        "\tThe Resulted Mean of percentage returns: %lg%%\n"
-        //        "\tThe Resulted Standard dev of percentage returns: %lg%%\n",
-        //        i, add_ticker, decrease_ticker, data_buf[0], data_buf[1]);
+         printf("Received from process %d: The best strategy is to add %s and decrease %s.\n"
+                "\tThe Resulted Mean of percentage returns: %lg%%\n"
+                "\tThe Resulted Standard dev of percentage returns: %lg%%\n",
+                i, add_ticker, decrease_ticker, data_buf[0], data_buf[1]);
 
         if (curr_best_result < data_buf[0]) {
-            // curr_best_zone = i;
+             curr_best_zone = i;
+            printf("Discovered %d is better! Exchanging!\n", i);
             curr_add_ticker = add_ticker;
             curr_decrease_ticker = decrease_ticker;
             curr_best_result = data_buf[0];
             curr_best_dev = data_buf[1];
         }
+        printf("Current decrease ticker is %s\n", curr_decrease_ticker);
     }
 
-    printf("\nThe best strategy is to add %s while decreasing %s\n", curr_add_ticker, curr_decrease_ticker);
+    printf("\nThe best strategy is to add %s while decreasing %s, the best process is %d \n", curr_add_ticker, curr_decrease_ticker, curr_best_zone);
     printf("The Resulted Mean of percentage returns: %lg%%\n"
            "The Resulted Standard dev of percentage returns: %lg%%\n",
            curr_best_result, curr_best_dev);
