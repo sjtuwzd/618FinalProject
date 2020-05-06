@@ -20,6 +20,8 @@
 
 #if MPI
 #include <mpi.h>
+void gather_perf(int nzone, double *total_rets, int NUM_RUNS);
+void send_perf(double *total_rets, int run_start, int run_end);
 void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, double best_result_0, double best_dev_0);
 void send_node_state(char* add_ticker, char* decrease_ticker, double best_result, double best_dev);
 #endif
@@ -28,7 +30,7 @@ int main(int argc, char **argv) {
 
     unsigned long seed = 0;
     if (argc < 5 || argc > 6) {
-        printf("ERROR: You have not provided exactly five or"
+        printf("ERROR: You have not provided exactly five or "
                "exactly six arguments\n");
         exit(1);
         /* Set the seed if it has been provided */
@@ -149,13 +151,16 @@ int main(int argc, char **argv) {
     int best_j = 0;
     double best_dev = 0.0;
 
+    bool best_mode = false;
+
     printf("\nStart MPI.\n");
 
     int process_count = 1;
     int this_zone = 0;
     int nzone = 0;
 #if MPI
-    if(strcmp(METHOD, "best") == 0) {
+    if (strcmp(METHOD, "best") == 0) {
+        best_mode = true;
         MPI_Init(NULL, NULL);
         MPI_Comm_size(MPI_COMM_WORLD, &process_count);
         MPI_Comm_rank(MPI_COMM_WORLD, &this_zone);
@@ -166,7 +171,7 @@ int main(int argc, char **argv) {
     bool mpi_master = this_zone == 0;
 
     // if is for best strategy
-    if(strcmp(METHOD, "best") == 0) {
+    if (strcmp(METHOD, "best") == 0) {
         nzone = process_count;
         printf("Rank %d out of %d processes.\n", this_zone, nzone);
 
@@ -190,7 +195,7 @@ int main(int argc, char **argv) {
         gettimeofday(&total_sim_begin, NULL);
     }
     printf("J end is: %d\n", j_end);
-    printf("Process %d, start i is %d, end i is %d\n", this_zone,i_start, i_end);
+    printf("Process %d, start i is %d, end i is %d\n", this_zone, i_start, i_end);
     for (int i = i_start; i < i_end; i++) {
         for (int j = 0; j < j_end; j++) {
 
@@ -217,7 +222,7 @@ int main(int argc, char **argv) {
                 snprintf(result_filename, result_fname_chars, "%s/%s_add%s_minus%s.%s",
                          result_subdir, name, assets[j].ticker, assets[i].ticker, result_extension);
 
-//                printf("Adding weight of %s, decreasing weight of %s\n", assets[j].ticker, assets[i].ticker);
+                // printf("Adding weight of %s, decreasing weight of %s\n", assets[j].ticker, assets[i].ticker);
                 /* This file will contain the final porfolio returns for all runs */
                 // FILE *results_file = fopen("data/results.txt", "w");
                 FILE *results_file = fopen(result_filename,  "w");
@@ -227,9 +232,27 @@ int main(int argc, char **argv) {
                 gettimeofday(&sim_begin, NULL);
 
                 if (results_file) {
+                    int run_start = 0, run_end = NUM_RUNS;
                     /* Each run of this loop is one simulation of portfolio's return */
                     // #pragma omp parallel for
-                    for (int run = 0; run < NUM_RUNS; run++) {
+#if MPI
+                    if (!best_mode) {
+                        MPI_Init(NULL, NULL);
+                        MPI_Comm_size(MPI_COMM_WORLD, &process_count);
+                        MPI_Comm_rank(MPI_COMM_WORLD, &this_zone);
+
+                        nzone = process_count;
+                        mpi_master = this_zone == 0;
+                        printf("Performance Simulation: rank %d out of %d processes.\n", this_zone, nzone);
+
+                        run_start = this_zone * (ceil((double)NUM_RUNS / (double)nzone));
+                        run_end = (this_zone + 1) * (ceil((double)NUM_RUNS / (double)nzone));
+                        run_end = this_zone == nzone - 1 ? NUM_RUNS : run_end;
+                        printf("run_start = %d, run_end = %d\n", run_start, run_end);
+                    }
+#endif
+
+                    for (int run = run_start; run < run_end; run++) {
                         double total_return = 0;
 
                         gsl_rng *rng;
@@ -257,6 +280,17 @@ int main(int argc, char **argv) {
                         total_rets[run] = total_return;
                     }
                     gettimeofday(&sim_end, NULL);
+
+#if MPI
+                    if (!best_mode) {
+                        if (mpi_master)
+                            gather_perf(nzone, total_rets, NUM_RUNS);
+                        else
+                            send_perf(total_rets, run_start, run_end);
+
+                        MPI_Finalize();
+                    }
+#endif
 
                     /* Calculate time elapsed for data retrieval and simulations */
                     retrieval_time = retrieval_end.tv_sec - retrieval_begin.tv_sec;
@@ -290,9 +324,9 @@ int main(int argc, char **argv) {
                             best_j = j;
                         }
                     }
-
-                    printf("Process %d, I is %d, j is %d, Adding weight of %s, decreasing weight of %s, Mean of percentage returns: %lg%%.Standard dev of percentage returns: %lg%%\n", this_zone, i, j,
-                            assets[j].ticker, assets[i].ticker, res_mean, res_std);
+                    if (best_mode || (!best_mode && mpi_master))
+                        printf("Process %d, I is %d, j is %d, Adding weight of %s, decreasing weight of %s, Mean of percentage returns: %lg%%.Standard dev of percentage returns: %lg%%\n", this_zone, i, j,
+                               assets[j].ticker, assets[i].ticker, res_mean, res_std);
                 } else {
                     printf("NO RESULTS FILE\n");
                 }
@@ -312,15 +346,15 @@ int main(int argc, char **argv) {
     // }
 
 #if !MPI
-         printf("Process %d: The best strategy is to add %s while decreasing %s\n", this_zone, assets[best_j].ticker, assets[best_i].ticker);
-         printf("Process %d: The Resulted Mean of percentage returns: %lg%%\n"
-                "The Resulted Standard dev of percentage returns: %lg%%\n",
-                this_zone, best_result, best_dev);
+    printf("Process %d: The best strategy is to add %s while decreasing %s\n", this_zone, assets[best_j].ticker, assets[best_i].ticker);
+    printf("Process %d: The Resulted Mean of percentage returns: %lg%%\n"
+           "The Resulted Standard dev of percentage returns: %lg%%\n",
+           this_zone, best_result, best_dev);
 #endif
     gsl_matrix_free(cholesky);
 
 #if MPI
-    if(strcmp(METHOD, "best") == 0) {
+    if (strcmp(METHOD, "best") == 0) {
         if (mpi_master)
             gather_node_state(nzone, assets[best_j].ticker, assets[best_i].ticker, best_result, best_dev);
         else
@@ -330,7 +364,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
-    if(mpi_master) {
+    if (mpi_master) {
         gettimeofday(&total_sim_end, NULL);
         total_sim_time = total_sim_end.tv_sec - total_sim_begin.tv_sec;
         total_sim_time += ((double) (total_sim_end.tv_usec - total_sim_begin.tv_usec)) / 1000000.0;
@@ -340,15 +374,48 @@ int main(int argc, char **argv) {
 }
 
 #if MPI
+/* Called by process 0 to collect performance states from all other processes */
+void gather_perf(int nzone, double *total_rets, int NUM_RUNS) {
+    int i, j, run_start, run_end, run_num;
+
+    for (i = 1; i < nzone; i++) {
+        run_start = i * (ceil((double)NUM_RUNS / (double)nzone));
+        run_end = (i + 1) * (ceil((double)NUM_RUNS / (double)nzone));
+        run_end = i == nzone - 1 ? NUM_RUNS : run_end;
+        run_num = run_end - run_start;
+        printf("Receive %d total return valus from process %d\n", run_num, i);
+
+        double *data_buf = malloc(run_num * sizeof(double));
+
+        MPI_Recv(data_buf, run_num,
+                 MPI_DOUBLE, i, 0, MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+
+        for (j = 0; j < run_num; j++) {
+            total_rets[run_start + j] = data_buf[j];
+        }
+
+        free(data_buf);
+    }
+}
+
+/* Called by other processes to send their node states to process 0 */
+void send_perf(double *total_rets, int run_start, int run_end) {
+    int run_num = run_end - run_start;
+
+    MPI_Send(total_rets + run_start, run_num,
+             MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+}
+
 /* Called by process 0 to collect node states from all other processes */
 void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, double best_result_0, double best_dev_0) {
     int i;
     /* MPI buffer */
-//    char add_ticker[5];
-//    char decrease_ticker[5];
-//    double data_buf[2];
+    // char add_ticker[5];
+    // char decrease_ticker[5];
+    // double data_buf[2];
 
-     int curr_best_zone = 0;
+    int curr_best_zone = 0;
     char* curr_add_ticker = add_ticker_0;
     char* curr_decrease_ticker = decrease_ticker_0;
     double curr_best_result = best_result_0;
@@ -357,12 +424,13 @@ void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, d
     for (i = 1; i < nzone; i++) {
 
         printf("At beginning decrease ticker is %s\n", curr_decrease_ticker);
-            /* MPI buffer */
-//    char add_ticker[5];
-//    char decrease_ticker[5];
-    char *add_ticker = malloc(5 * sizeof(char));
-    char *decrease_ticker = malloc(5 * sizeof(char));
-    double data_buf[2];
+        /* MPI buffer */
+        // char add_ticker[5];
+        // char decrease_ticker[5];
+        char *add_ticker = malloc(5 * sizeof(char));
+        char *decrease_ticker = malloc(5 * sizeof(char));
+        double data_buf[2];
+
         MPI_Recv(add_ticker, 5,
                  MPI_CHAR, i, 0, MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
@@ -375,13 +443,13 @@ void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, d
                  MPI_DOUBLE, i, 0, MPI_COMM_WORLD,
                  MPI_STATUS_IGNORE);
 
-         printf("Received from process %d: The best strategy is to add %s and decrease %s.\n"
-                "\tThe Resulted Mean of percentage returns: %lg%%\n"
-                "\tThe Resulted Standard dev of percentage returns: %lg%%\n",
-                i, add_ticker, decrease_ticker, data_buf[0], data_buf[1]);
+        printf("Received from process %d: The best strategy is to add %s and decrease %s.\n"
+               "\tThe Resulted Mean of percentage returns: %lg%%\n"
+               "\tThe Resulted Standard dev of percentage returns: %lg%%\n",
+               i, add_ticker, decrease_ticker, data_buf[0], data_buf[1]);
 
         if (curr_best_result < data_buf[0]) {
-             curr_best_zone = i;
+            curr_best_zone = i;
             printf("Discovered %d is better! Exchanging!\n", i);
             curr_add_ticker = add_ticker;
             curr_decrease_ticker = decrease_ticker;
@@ -389,6 +457,9 @@ void gather_node_state(int nzone, char* add_ticker_0, char* decrease_ticker_0, d
             curr_best_dev = data_buf[1];
         }
         printf("Current decrease ticker is %s\n", curr_decrease_ticker);
+
+        free(add_ticker);
+        free(decrease_ticker);
     }
 
     printf("\nThe best strategy is to add %s while decreasing %s, the best process is %d \n", curr_add_ticker, curr_decrease_ticker, curr_best_zone);

@@ -3,7 +3,7 @@ MPICC = mpicc
 CC=gcc
 DEBUG=0
 INSTRUMENT=1
-CFLAGS=-g -O3 -Wall -DDEBUG=$(DEBUG) -DTRACK=$(INSTRUMENT) -std=gnu99 -I /home/zhengdaw/gsl/include -L /home/zhengdaw/gsl/lib -lgsl -L /home/zhengdaw/gsl/lib -lgslcblas
+CFLAGS=-g -O3 -Wall -DDEBUG=$(DEBUG) -DTRACK=$(INSTRUMENT) -std=gnu99 -I /home/jinleic/jinleic/gsl/include -L /home/jinleic/jinleic/gsl/lib -lgsl -L /home/jinleic/jinleic/gsl/lib -lgslcblas
 #CFILES = main.c file_helper.c portfolio_helper.c
 #HFILES = file_helper.h portfolio_helper.h
 
