@@ -13,7 +13,7 @@ best is one of the two mode this program runs, if it's something other than best
 if it is exactly "best" then the program would solve the single-transaction problem
 
 Parallel Version:
-mpirun -np mpirun -np 12 ./port_analyzer_parallel 50 10000 EXP
+mpirun -np mpirun -np 12 ./port_analyzer_parallel 50 10000 EXP best
 
 Special thanks to 
 https://pbpython.com/monte-carlo.html
